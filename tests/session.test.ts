@@ -138,3 +138,81 @@ describe("parseSessionQuery", () => {
     expect(parsed.techName).toBe("Maya");
   });
 });
+
+describe("QA-1 regression: page call-site shape (full query string, never the bare value)", () => {
+  // The session page (app/s/[sessionId]/page.tsx) builds its query string
+  // from raw searchParams — t and c — and passes THAT to parseSessionQuery,
+  // never the bare encoded value (which decoded to nothing and fell back to
+  // "your nail tech"). Pin the exact call-site shape here so the page-side
+  // contract cannot silently regress again.
+  function pageQueryString(
+    sp: Record<string, string | undefined>
+  ): string | undefined {
+    const qs = new URLSearchParams();
+    for (const key of ["t", "c"] as const) {
+      const value = sp[key];
+      if (value !== undefined) qs.set(key, String(value));
+    }
+    const out = qs.toString();
+    return out || undefined;
+  }
+
+  const PAGE_FALLBACK = "your nail tech";
+
+  it("decodes tech name AND contact from a query built at the page call-site shape", () => {
+    const sp = { t: encodeParam("Maya"), c: encodeParam("IG @maya.nails") };
+    const parsed = parseSessionQuery(pageQueryString(sp), PAGE_FALLBACK);
+    expect(parsed.techName).toBe("Maya");
+    expect(parsed.contactHint).toBe("IG @maya.nails");
+  });
+
+  it("decodes t even when c is absent (c must never block the name)", () => {
+    const parsed = parseSessionQuery(
+      pageQueryString({ t: encodeParam("Maya") }),
+      PAGE_FALLBACK
+    );
+    expect(parsed.techName).toBe("Maya");
+    expect(parsed.contactHint).toBeUndefined();
+  });
+
+  it("regression: the BARE encoded value (pre-fix behavior) decodes to nothing — the query string is required", () => {
+    const bare = encodeParam("Maya");
+    // Pre-fix call site: parseSessionQuery(sp.t) — the bare value, not a
+    // query string. URLSearchParams treats it as a stray empty param.
+    expect(parseSessionQuery(bare, PAGE_FALLBACK).techName).toBe(PAGE_FALLBACK);
+    // Post-fix call site: the value goes through a real query string.
+    expect(parseSessionQuery(`t=${bare}`, PAGE_FALLBACK).techName).toBe("Maya");
+  });
+
+  it("fatal-decoder garbage and absent params fall back cleanly", () => {
+    for (const sp of [
+      { t: "abc" }, // well-formed base64url, invalid UTF-8 -> fatal decode
+      { t: "%21%21%21" },
+      { c: "xyz" },
+      {},
+    ]) {
+      const parsed = parseSessionQuery(pageQueryString(sp), PAGE_FALLBACK);
+      expect(parsed.techName).toBe(PAGE_FALLBACK);
+      expect(parsed.contactHint).toBeUndefined();
+    }
+  });
+});
+
+describe("isValidSessionId gating (page guard, untouched by QA-1 fix)", () => {
+  it("accepts canonical UUID shapes, case-insensitively", () => {
+    expect(isValidSessionId("8f14e45f-ceea-4671-9e3a-0f1a2b3c4d5e")).toBe(true);
+    expect(isValidSessionId("8F14E45F-CEEA-4671-9E3A-0F1A2B3C4D5E")).toBe(true);
+  });
+
+  it("rejects non-UUID garbage", () => {
+    for (const id of [
+      "",
+      "abc",
+      "not-a-uuid",
+      "8f14e45f-ceea-4671-9e3a-0f1a2b3c4d5eX", // extra char
+      "8f14e45fceea46719e3a0f1a2b3c4d5e", // no dashes
+    ]) {
+      expect(isValidSessionId(id)).toBe(false);
+    }
+  });
+});
