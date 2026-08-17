@@ -2,8 +2,9 @@
  * lib/geometry — affine math and the mm measurement seam.
  *
  * Acceptance-critical: nail widths are read via mmDistance(cardQuad.affine,
- * p1, p2); a 150 px guide on a 10 px/mm card must read 15 mm, and the long
- * edge (85.6 mm) alone defines the scale.
+ * p1, p2); a 150 px guide along the long edge (10 px/mm) must read 15 mm, and
+ * every reading is the exact card-plane distance — each axis scales by its own
+ * px/mm, and tilt never over-reads.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -95,16 +96,29 @@ describe("mmDistance — the width measurement seam", () => {
     expect(mm).toBeCloseTo(15, 6);
   });
 
-  it("is orientation-invariant (vertical and diagonal segments)", () => {
-    expect(mmDistance(m, { x: 100, y: 100 }, { x: 100, y: 250 })).toBeCloseTo(15, 6);
-    expect(mmDistance(m, { x: 100, y: 100 }, { x: 100 + 75, y: 100 + 75 * 0.75 })).toBeCloseTo(
-      Math.hypot(75, 56.25) / 10,
+  it("is orientation-invariant: a 150 px segment reads its exact card-plane distance on any axis", () => {
+    // True axis scales: 856 px → 85.6 mm (0.1 mm/px) and 540 px → 53.98 mm.
+    // A vertical 150 px segment now reads the y-axis scale — 53.98/540 × 150 ≈
+    // 14.9944 mm — NOT the old isotropic long-edge 15.0.
+    expect(mmDistance(m, { x: 100, y: 100 }, { x: 100, y: 250 })).toBeCloseTo(
+      150 * (53.98 / 540),
+      6
+    );
+    // Diagonal 150 px (3-4-5: 90 px across, 120 px down): each axis contributes
+    // its own exact px/mm scale → ≈ 14.996 mm, not the isotropic 15.0.
+    expect(mmDistance(m, { x: 100, y: 100 }, { x: 190, y: 220 })).toBeCloseTo(
+      Math.hypot(90 * (85.6 / 856), 120 * (53.98 / 540)),
       6
     );
   });
 
-  it("a 15 mm nail at a 25° tilt over-reads by ~10% and trips the warning", () => {
-    // Long edge compressed by cos(25°) ≈ 0.9063.
+  it("reads EXACTLY 15 mm at tilt — long-axis 25° and short-axis 20° (no over-read)", () => {
+    // The tilt warning is decoupled from mmDistance: isTilted + TILT_WARN_RATIO
+    // drive the calibration-step warning (covered in card.test.ts "tilt warning
+    // threshold"). Both tilts exceed TILT_WARN_RATIO (cos 25° ≈ 0.9063,
+    // cos 20° ≈ 0.9397 < 0.967) and used to over-read by ~1/cos(tilt); the exact
+    // card-plane mapping must now return 15.0 exactly.
+    // Long-axis tilt: long edge compressed by cos(25°).
     const c = Math.cos((25 * Math.PI) / 180);
     const tilted = CORNERS.map((p, i) => ({
       x: i === 1 || i === 2 ? p.x * c : p.x,
@@ -112,9 +126,21 @@ describe("mmDistance — the width measurement seam", () => {
     }));
     const mt = fitAffine(tilted, NOMINAL) as Affine;
     // True 15 mm nail lies along the compressed (long) axis.
-    const mm = mmDistance(mt, { x: 100, y: 200 }, { x: 100 + 150 * c, y: 200 });
-    expect(mm).toBeGreaterThan(15); // over-read
-    expect(mm).toBeLessThan(15 * 1.12);
+    expect(mmDistance(mt, { x: 100, y: 200 }, { x: 100 + 150 * c, y: 200 })).toBeCloseTo(15, 6);
+
+    // Short-axis tilt: short edge compressed by cos(20°).
+    const cs = Math.cos((20 * Math.PI) / 180);
+    const tiltedS = CORNERS.map((p, i) => ({
+      x: p.x,
+      y: i === 2 || i === 3 ? p.y * cs : p.y,
+    }));
+    const ms = fitAffine(tiltedS, NOMINAL) as Affine;
+    // True 15 mm nail along the compressed (short) axis; the short-edge scale
+    // is 540/53.98 px/mm, so the nail spans 15 × 540/53.98 px before compression.
+    const shortPxPerMm = 540 / 53.98;
+    expect(
+      mmDistance(ms, { x: 200, y: 100 }, { x: 200, y: 100 + 15 * shortPxPerMm * cs })
+    ).toBeCloseTo(15, 6);
   });
 });
 

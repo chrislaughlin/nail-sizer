@@ -90,6 +90,37 @@ describe("buildSessionLink", () => {
     expect(link.href).toMatch(/^\/s\/[0-9a-f-]{36}\?t=/);
   });
 
+  it("fallback id is a valid 8-4-4-4-12 UUID shape and the link round-trips when crypto.randomUUID is unavailable (CQ-3)", () => {
+    // Node defines randomUUID on Crypto.prototype, so `delete crypto.randomUUID`
+    // is a no-op there and would leave the fallback branch untested. Removing
+    // the whole global crypto capability produces the same observable condition
+    // for lib/session (`typeof crypto === "undefined"`), forcing
+    // generateFallbackId(). Pinning Math.random makes the fallback id
+    // deterministic: "80000000-8000-8000-8000-800000008000". A real v4 UUID can
+    // never equal it (v4 forces a "4" version nibble in group 3), so this
+    // assertion proves the fallback branch actually ran AND pins the exact
+    // 8-4-4-4-12 shape — the pre-fix 8-4-4-4-8 shape failed isValidSessionId
+    // and made fallback session links 404.
+    const cryptoDescriptor = Object.getOwnPropertyDescriptor(globalThis, "crypto");
+    const randomBackup = Math.random;
+    try {
+      delete (globalThis as { crypto?: Crypto }).crypto;
+      Math.random = () => 0.5;
+      const link = buildSessionLink("Maya", "IG @maya");
+      expect(link.sessionId).toBe("80000000-8000-8000-8000-800000008000");
+      expect(isValidSessionId(link.sessionId)).toBe(true);
+      // The fallback id is what gets embedded in the shareable href — the
+      // pre-fix invalid 8-4-4-4-8 shape made these links 404 on the page guard.
+      expect(link.href).toContain(`/s/${link.sessionId}`);
+      const parsed = parseSessionQuery(new URL(link.href, "http://x").search, "fallback");
+      expect(parsed.techName).toBe("Maya");
+      expect(parsed.contactHint).toBe("IG @maya");
+    } finally {
+      Math.random = randomBackup;
+      if (cryptoDescriptor) Object.defineProperty(globalThis, "crypto", cryptoDescriptor);
+    }
+  });
+
   it("contains no raw user content in the href", () => {
     const link = buildSessionLink(ATTACK_NAME, "call me <script>alert(1)</script>");
     // Encoded params only — the raw name/hint (tags, quotes, '?', '#') must
