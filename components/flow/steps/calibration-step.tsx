@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { correctedAspect, detectCard, isTilted, quadFromCorners } from "@/lib/cv/card";
+import { classifyAspect, correctedAspect, detectCard, isTilted, quadFromCorners } from "@/lib/cv/card";
 import type { WorkingImage } from "@/lib/cv/image";
 import type { CardQuad, Point } from "@/lib/types";
 import CaptureView, { type CaptureMode, type FrozenFrame } from "../capture";
@@ -103,10 +103,11 @@ export default function CalibrationStep({ onCalibrated }: CalibrationStepProps) 
     const aspect = q.corners.length
       ? correctedAspect(q)
       : 0;
-    if (aspect >= 1.67 && aspect <= 1.86) {
+    const kind = classifyAspect(aspect);
+    if (kind === "business-card") {
       setManualQuad(null);
       setManualAspectBad("business-card");
-    } else if (aspect >= 1.5 && aspect <= 1.66) {
+    } else if (kind === "ok") {
       setManualQuad(q);
       setManualAspectBad(null);
     } else {

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   buildTextSummary,
   chartDataFromProgress,
+  downloadBlob,
   renderChart,
   shareChartPng,
 } from "@/lib/chart";
@@ -69,14 +70,7 @@ export default function ReviewStep({ progress, onRestart }: ReviewStepProps) {
     if (!canvas) return;
     canvas.toBlob((blob) => {
       if (!blob) return;
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "nail-sizer-chart.png";
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      downloadBlob(blob, "nail-sizer-chart.png");
     }, "image/png");
     setShareStatus("Chart downloaded as a PNG");
   }, []);

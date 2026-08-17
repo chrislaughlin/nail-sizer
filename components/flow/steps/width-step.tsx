@@ -8,7 +8,7 @@ import {
   FINGER_LABELS,
   HAND_LABELS,
 } from "@/lib/constants";
-import { correctedAspect, detectCard, quadFromCorners } from "@/lib/cv/card";
+import { classifyAspect, correctedAspect, detectCard, quadFromCorners } from "@/lib/cv/card";
 import { proposeNailGuides, placeGuideAt } from "@/lib/cv/nails";
 import { mmDistance } from "@/lib/geometry";
 import type {
@@ -159,10 +159,11 @@ export default function WidthStep({ hand, onComplete }: WidthStepProps) {
     const q = quadFromCorners(next);
     if (!q) return;
     const aspect = correctedAspect(q);
-    if (aspect >= 1.67 && aspect <= 1.86) {
+    const kind = classifyAspect(aspect);
+    if (kind === "business-card") {
       setManualQuad(null);
       setManualAspectBad("business-card");
-    } else if (aspect >= 1.5 && aspect <= 1.66) {
+    } else if (kind === "ok") {
       setManualQuad(q);
       setManualAspectBad(null);
       setCardQuad(q);

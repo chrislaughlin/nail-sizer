@@ -77,7 +77,7 @@ export function detectCard(
 
   for (let label = 0; label < count; label++) {
     if (areas[label] < minArea) continue;
-    const boundary = componentBoundary(labels, edgeMask, w, h, label);
+    const boundary = componentBoundary(labels, w, h, label);
     if (boundary.points.length < 20) continue;
     const hull = convexHull(boundary.points);
     if (hull.length < 4) continue;
@@ -163,13 +163,22 @@ export function detectCard(
 
   const q = best.quad;
   const trueAspect = correctedAspect(q);
-  if (trueAspect >= CARD_ASPECT_MIN && trueAspect <= CARD_ASPECT_MAX) {
-    return { kind: "ok", quad: q };
-  }
-  if (trueAspect >= BIZCARD_ASPECT_MIN && trueAspect <= BIZCARD_ASPECT_MAX) {
+  const kind = classifyAspect(trueAspect);
+  if (kind === "ok") return { kind: "ok", quad: q };
+  if (kind === "business-card") {
     return { kind: "business-card", detectedAspect: trueAspect };
   }
   return { kind: "unknown", detectedAspect: trueAspect };
+}
+
+/**
+ * Classify a card aspect ratio against the constants' ID-1 and business-card
+ * bands. Single source of truth for the auto-detect and manual-corner paths.
+ */
+export function classifyAspect(aspect: number): "ok" | "business-card" | "unknown" {
+  if (aspect >= CARD_ASPECT_MIN && aspect <= CARD_ASPECT_MAX) return "ok";
+  if (aspect >= BIZCARD_ASPECT_MIN && aspect <= BIZCARD_ASPECT_MAX) return "business-card";
+  return "unknown";
 }
 
 /**

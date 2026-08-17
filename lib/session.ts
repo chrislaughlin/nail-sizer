@@ -82,5 +82,5 @@ export function parseSessionQuery(
 function generateFallbackId(): string {
   const hex = () =>
     Math.random().toString(16).slice(2, 10).padEnd(8, "0");
-  return `${hex()}-${hex().slice(0, 4)}-${hex().slice(0, 4)}-${hex().slice(0, 4)}-${hex().slice(0, 12)}`;
+  return `${hex()}-${hex().slice(0, 4)}-${hex().slice(0, 4)}-${hex().slice(0, 4)}-${hex()}${hex().slice(0, 4)}`;
 }

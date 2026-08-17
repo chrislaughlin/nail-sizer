@@ -20,10 +20,7 @@ interface CurveStepProps {
   widths: Partial<Record<Finger, NailWidth>>;
   attempts: number;
   onAttempt: () => void;
-  onComplete: (
-    curves: Partial<Record<Finger, NailCurve>>,
-    unmeasuredAll: boolean
-  ) => void;
+  onComplete: (curves: Partial<Record<Finger, NailCurve>>) => void;
 }
 
 /** Same leftmost → rightmost ordering as the width step. */
@@ -149,7 +146,7 @@ export default function CurveStep({
         curves[c.finger] = { status: "measured", class: c.class, radiusMm: c.radiusMm };
       }
     }
-    onComplete(curves, false);
+    onComplete(curves);
   }, [candidates, confirmed, onComplete]);
 
   const skipHand = useCallback(() => {
@@ -158,7 +155,7 @@ export default function CurveStep({
     for (const f of FINGERS) {
       curves[f] = { status: "unmeasured" };
     }
-    onComplete(curves, true);
+    onComplete(curves);
   }, [onComplete]);
 
   const maxAttemptsReached = attempts >= 2;

@@ -37,7 +37,6 @@ export default function CaptureView({
   liveOverlay,
 }: CaptureViewProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
-  const analysisCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -102,10 +101,6 @@ export default function CaptureView({
     if (mode !== "live" || !liveReady) return;
     const video = videoRef.current;
     if (!video) return;
-    if (!analysisCanvasRef.current) {
-      analysisCanvasRef.current = document.createElement("canvas");
-    }
-    const canvas = analysisCanvasRef.current;
     let frame = 0;
     let lastTick = 0;
 
@@ -116,16 +111,9 @@ export default function CaptureView({
       }
       frame++;
       if (frame % 3 === 0 && now - lastTick > 220) {
-        const scale = Math.min(1, LIVE_DIM / Math.max(video.videoWidth, video.videoHeight));
-        canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
-        canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
-        const ctx = canvas.getContext("2d", { willReadFrequently: true });
-        if (ctx) {
-          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-          const image = readImagePixels(video, video.videoWidth, video.videoHeight, LIVE_DIM);
-          onLiveTick(image);
-          lastTick = now;
-        }
+        const image = readImagePixels(video, video.videoWidth, video.videoHeight, LIVE_DIM);
+        onLiveTick(image);
+        lastTick = now;
       }
       rafRef.current = requestAnimationFrame(tick);
     };

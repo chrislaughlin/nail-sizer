@@ -99,13 +99,11 @@ export function boxBlur(src: Uint8ClampedArray, w: number, h: number, r: number)
 
 export interface EdgeMap {
   magnitude: Uint8ClampedArray;
-  direction: Uint8ClampedArray; // 0 = horizontal edge, 1 = vertical edge
 }
 
-/** Sobel edge magnitude + dominant orientation. */
+/** Sobel edge magnitude (thresholded). */
 export function sobel(gray: Uint8ClampedArray, w: number, h: number): EdgeMap {
   const magnitude = new Uint8ClampedArray(w * h);
-  const direction = new Uint8ClampedArray(w * h);
   let max = 1;
   for (let y = 1; y < h - 1; y++) {
     for (let x = 1; x < w - 1; x++) {
@@ -120,14 +118,13 @@ export function sobel(gray: Uint8ClampedArray, w: number, h: number): EdgeMap {
       const m = Math.hypot(gx, gy);
       magnitude[i] = m > 255 ? 255 : m;
       if (m > max) max = m;
-      direction[i] = Math.abs(gy) > Math.abs(gx) ? 1 : 0;
     }
   }
   const thr = max * 0.18;
   for (let i = 0; i < w * h; i++) {
     magnitude[i] = magnitude[i] >= thr ? 255 : 0;
   }
-  return { magnitude, direction };
+  return { magnitude };
 }
 
 /** Binary morphological close (dilate then erode) with a square kernel. */
@@ -215,7 +212,6 @@ export interface Boundary {
  *  non-masked 4-neighbour). */
 export function componentBoundary(
   labels: Int32Array,
-  mask: Uint8ClampedArray,
   w: number,
   h: number,
   label: number
