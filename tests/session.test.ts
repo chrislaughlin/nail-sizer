@@ -55,6 +55,15 @@ describe("encodeParam / decodeParam", () => {
       expect(() => decodeParam(g)).not.toThrow();
     }
   });
+
+  it("rejects valid base64url that is not valid UTF-8 (no mojibake)", () => {
+    // "abc" is well-formed base64url but decodes to bytes 0x69 0xB7 — an
+    // invalid UTF-8 sequence. The fatal decoder must fall back to null, not
+    // return a U+FFFD replacement string that passes the truthiness checks.
+    expect(decodeParam("abc")).toBeNull();
+    expect(decodeParam("xyz-_-")).toBeNull();
+    expect(parseSessionQuery("t=abc", "fb").techName).toBe("fb");
+  });
 });
 
 describe("sanitization caps", () => {

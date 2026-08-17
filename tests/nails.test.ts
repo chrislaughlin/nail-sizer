@@ -6,7 +6,7 @@
  */
 import { describe, expect, it } from "vitest";
 import { proposeNailGuides, skinMask } from "../lib/cv/nails";
-import { handImage, makeImage, SKIN, DARK_BG } from "./helpers";
+import { handImage, makeImage, SKIN, DARK_BG, wavySlabImage } from "./helpers";
 
 describe("skinMask", () => {
   it("labels skin pixels and rejects background", () => {
@@ -44,5 +44,13 @@ describe("proposeNailGuides", () => {
       expect(Math.hypot(p.p2.x - p.p1.x, p.p2.y - p.p1.y)).toBeGreaterThan(8);
       expect(p.id).toBeGreaterThanOrEqual(0);
     }
+  });
+
+  it("proposes nothing on a smooth undulating boundary (no shoulder prominence)", () => {
+    // Gentle 5 px waves: local minima of the top boundary descend < 7 px
+    // within the 20 px shoulder window on both sides. Fingertip domes rise
+    // from deep inter-finger gaps; smooth silhouettes must stay silent.
+    const img = wavySlabImage(640, 480);
+    expect(proposeNailGuides(img)).toEqual([]);
   });
 });

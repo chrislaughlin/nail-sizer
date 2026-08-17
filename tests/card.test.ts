@@ -81,6 +81,18 @@ describe("aspect classification (ID-1 vs business card)", () => {
     expect(det.kind).toBe("business-card");
   });
 
+  it("still refuses a business card with rounded corners (quad fit + aspect together)", () => {
+    // Rounded corners route through fitQuadFromHull; the fitted quad must
+    // still classify as business-card, not drift into the ID-1 band.
+    const img = cardImage({ w: 640, h: 480, cardW: 525, cardH: 300, radius: 19 });
+    const det = detectCard(img);
+    expect(det.kind).toBe("business-card");
+    if (det.kind === "unknown") {
+      // Diagnostic: even a misclassification should see the ~1.75 aspect.
+      expect(det.detectedAspect).toBeGreaterThanOrEqual(1.7);
+    }
+  });
+
   it("accepts an ID-1 card photo automatically", () => {
     const img = cardImage({ w: 640, h: 480, cardW: 540, cardH: 340 });
     const det = detectCard(img);

@@ -119,6 +119,18 @@ export function handImage(w: number, h: number): WorkingImage {
   });
 }
 
+/** Smooth undulating silhouette: gentle 5 px waves on the top boundary
+ *  (40 px half-wavelength). The D5 defect class — a boundary whose local
+ *  minima descend less than the shoulder-prominence threshold on both
+ *  sides within the detection window — must never yield a guide. */
+export function wavySlabImage(w: number, h: number): WorkingImage {
+  return makeImage(w, h, (x, y) => {
+    const waveY = 200 - 5 * Math.cos((2 * Math.PI * x) / 80);
+    if (y >= waveY && y <= 400) return SKIN;
+    return DARK_BG;
+  });
+}
+
 /** Synthetic end-on nails: filled discs (fingertip blobs). */
 export function discImage(
   w: number,
