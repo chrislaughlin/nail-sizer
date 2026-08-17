@@ -8,6 +8,25 @@ interface SessionPageProps {
   searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
+type SessionSearchParams = { [key: string]: string | string[] | undefined };
+
+function sessionQueryString(sp: SessionSearchParams): string | undefined {
+  const qs = new URLSearchParams();
+  for (const key of ["t", "c"] as const) {
+    const value = sp[key];
+    if (value !== undefined) qs.set(key, String(value));
+  }
+  const out = qs.toString();
+  return out || undefined;
+}
+
+function sessionDetails(sp: SessionSearchParams): {
+  techName: string;
+  contactHint?: string;
+} {
+  return parseSessionQuery(sessionQueryString(sp), "your nail tech");
+}
+
 export async function generateMetadata({
   params,
   searchParams,
@@ -15,10 +34,7 @@ export async function generateMetadata({
   const { sessionId } = await params;
   if (!isValidSessionId(sessionId)) return { title: "Nail Sizer" };
   const sp = await searchParams;
-  const { techName } = parseSessionQuery(
-    sp.t ? String(sp.t) : undefined,
-    "your nail tech"
-  );
+  const { techName } = sessionDetails(sp);
   const title = `Size your nails for ${techName} 💅`;
   return {
     title,
@@ -33,10 +49,7 @@ export default async function SessionPage({
   const { sessionId } = await params;
   if (!isValidSessionId(sessionId)) notFound();
   const sp = await searchParams;
-  const { techName, contactHint } = parseSessionQuery(
-    sp.t ? String(sp.t) : undefined,
-    "your nail tech"
-  );
+  const { techName, contactHint } = sessionDetails(sp);
   return (
     <MeasurementFlow
       sessionId={sessionId}
