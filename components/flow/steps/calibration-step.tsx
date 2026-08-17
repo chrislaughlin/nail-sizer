@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { detectCard, isTilted, quadFromCorners } from "@/lib/cv/card";
+import { correctedAspect, detectCard, isTilted, quadFromCorners } from "@/lib/cv/card";
 import type { WorkingImage } from "@/lib/cv/image";
 import type { CardQuad, Point } from "@/lib/types";
 import CaptureView, { type CaptureMode, type FrozenFrame } from "../capture";
@@ -101,7 +101,7 @@ export default function CalibrationStep({ onCalibrated }: CalibrationStepProps) 
     const q = quadFromCorners(next);
     if (!q) return;
     const aspect = q.corners.length
-      ? correctedAspectRatio(q)
+      ? correctedAspect(q)
       : 0;
     if (aspect >= 1.67 && aspect <= 1.86) {
       setManualQuad(null);
@@ -340,14 +340,6 @@ export default function CalibrationStep({ onCalibrated }: CalibrationStepProps) 
       )}
     </div>
   );
-}
-
-function correctedAspectRatio(q: CardQuad): number {
-  const { a, b, c, d } = q.affine;
-  const pxLong = Math.hypot(a, c);
-  const pxShort = Math.hypot(b, d);
-  const measured = (pxLong * 85.6) / (pxShort * 53.98);
-  return pxLong < pxShort ? measured / q.tiltRatio : measured * q.tiltRatio;
 }
 
 /** Draws the detected card outline on top of the frozen frame. */

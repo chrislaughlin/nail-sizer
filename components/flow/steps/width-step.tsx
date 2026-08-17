@@ -8,7 +8,7 @@ import {
   FINGER_LABELS,
   HAND_LABELS,
 } from "@/lib/constants";
-import { detectCard, quadFromCorners } from "@/lib/cv/card";
+import { correctedAspect, detectCard, quadFromCorners } from "@/lib/cv/card";
 import { proposeNailGuides, placeGuideAt } from "@/lib/cv/nails";
 import { mmDistance } from "@/lib/geometry";
 import type {
@@ -490,12 +490,4 @@ export default function WidthStep({ hand, onComplete }: WidthStepProps) {
       )}
     </div>
   );
-}
-
-function correctedAspect(q: CardQuad): number {
-  const { a, b, c, d } = q.affine;
-  const pxLong = Math.hypot(a, c);
-  const pxShort = Math.hypot(b, d);
-  const measured = (pxLong * 85.6) / (pxShort * 53.98);
-  return pxLong < pxShort ? measured / q.tiltRatio : measured * q.tiltRatio;
 }

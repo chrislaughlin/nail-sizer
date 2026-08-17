@@ -23,7 +23,7 @@ export function decodeParam(value: string | undefined | null): string | null {
     const padded = b64 + "=".repeat((4 - (b64.length % 4)) % 4);
     const binary = atob(padded);
     const bytes = Uint8Array.from(binary, (ch) => ch.charCodeAt(0));
-    return new TextDecoder().decode(bytes);
+    return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
   } catch {
     return null;
   }

@@ -97,23 +97,27 @@ export function proposeNailGuides(img: WorkingImage): NailProposal[] {
   }
 
   // Peak-pick fingertips: local minima of the top boundary with enough
-  // prominence, deduped by minimum separation.
+  // shoulder prominence, deduped by minimum separation. Fingertip domes
+  // rise from the inter-finger gaps, so the boundary climbs by many pixels
+  // on both sides; the flat palm boundary never does.
+  const SHOULDER_WINDOW = 20;
+  const PROMINENCE_PX = 7;
   const tipXs: number[] = [];
   for (let x = minX + 3; x < maxX - 3; x++) {
     const y0 = smoothTop[x];
     if (y0 < 0) continue;
     if (smoothTop[x - 1] < 0 || smoothTop[x + 1] < 0) continue;
     if (y0 > smoothTop[x - 1] || y0 > smoothTop[x + 1]) continue;
-    // prominence: must rise by at least 7px within 18px on both sides
-    let leftMin = y0;
-    let rightMin = y0;
-    for (let d = 1; d <= 18; d++) {
+    // Shoulders: highest boundary point within the window on each side.
+    let leftShoulder = y0;
+    let rightShoulder = y0;
+    for (let d = 1; d <= SHOULDER_WINDOW; d++) {
       const yl = smoothTop[x - d];
       const yr = smoothTop[x + d];
-      if (yl >= 0) leftMin = Math.min(leftMin, yl);
-      if (yr >= 0) rightMin = Math.min(rightMin, yr);
+      if (yl >= 0 && yl > leftShoulder) leftShoulder = yl;
+      if (yr >= 0 && yr > rightShoulder) rightShoulder = yr;
     }
-    if (leftMin - y0 >= 7 && rightMin - y0 >= 7) {
+    if (leftShoulder - y0 >= PROMINENCE_PX && rightShoulder - y0 >= PROMINENCE_PX) {
       tipXs.push(x);
     }
   }
@@ -186,43 +190,33 @@ function crossSectionAtTip(
   tip: Point,
   blobHeight: number
 ): { p1: Point; p2: Point } | null {
-  // Finger axis from PCA of blob pixels near the tip.
-  const r = 14;
+  // Finger axis: direction from the tip to the centroid of blob pixels in
+  // the band just below it. (The symmetric dome cap alone has no dominant
+  // direction, so the centroid must come from the finger shaft.)
+  const span = Math.min(blobHeight * 0.45, 90);
+  const half = 16;
   let sx = 0;
   let sy = 0;
   let n = 0;
-  const pts: Vec2[] = [];
-  for (let dy = -r; dy <= r; dy++) {
-    for (let dx = -r; dx <= r; dx++) {
+  for (let dy = 4; dy <= span; dy++) {
+    for (let dx = -half; dx <= half; dx++) {
       const x = Math.round(tip.x + dx);
       const y = Math.round(tip.y + dy);
       if (x < 0 || y < 0 || x >= w || y >= h) continue;
       if (labels[y * w + x] !== label) continue;
-      pts.push({ x, y });
       sx += x;
       sy += y;
       n++;
     }
   }
   if (n < 8) return null;
-  const cx = sx / n;
-  const cy = sy / n;
-  let sxx = 0;
-  let sxy = 0;
-  let syy = 0;
-  for (const p of pts) {
-    sxx += (p.x - cx) * (p.x - cx);
-    sxy += (p.x - cx) * (p.y - cy);
-    syy += (p.y - cy) * (p.y - cy);
-  }
-  // Eigenvector of the covariance with the largest eigenvalue.
-  const theta = 0.5 * Math.atan2(2 * sxy, sxx - syy);
-  let axis: Vec2 = { x: Math.cos(theta), y: Math.sin(theta) };
-  if (axis.y < 0) axis = { x: -axis.x, y: -axis.y }; // point into the blob (down)
+  const axis: Vec2 = { x: sx / n - tip.x, y: sy / n - tip.y };
+  const len = Math.hypot(axis.x, axis.y) || 1;
+  axis.x /= len;
+  axis.y /= len;
   const u: Vec2 = { x: -axis.y, y: axis.x }; // perpendicular
 
   // Scan cross-sections below the tip; keep the widest.
-  const span = Math.min(blobHeight * 0.45, 90);
   let best: { p1: Point; p2: Point; width: number } | null = null;
   for (let t = 4; t <= span; t += 2) {
     const px = tip.x + axis.x * t;

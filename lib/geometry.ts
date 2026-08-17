@@ -1,4 +1,4 @@
-import { CARD_LONG_MM } from "./constants";
+import { TILT_WARN_RATIO } from "./constants";
 import type { Affine, Point, Vec2 } from "./types";
 
 export function dist(a: Point, b: Point): number {
@@ -72,13 +72,16 @@ export function fitAffine(source: Point[], target: Point[]): Affine | null {
   const c = (sxyty * syy - sxy * syytx) / det;
   const d = (sxx * syytx - sxy * sxyty) / det;
 
+  const tcx = target.reduce((s, p) => s + p.x, 0) / n;
+  const tcy = target.reduce((s, p) => s + p.y, 0) / n;
+
   return {
     a,
     b,
     c,
     d,
-    tx: cx - (a * cx + b * cy),
-    ty: cy - (c * cx + d * cy),
+    tx: tcx - (a * cx + b * cy),
+    ty: tcy - (c * cx + d * cy),
   };
 }
 
@@ -121,18 +124,24 @@ export function affineSingularValues(m: Affine): { s1: number; s2: number } {
 }
 
 /**
- * Distance in mm between two image points under the card-plane affine
- * (inverse-maps both points into nominal card mm space).
+ * Distance in mm between two image points under the card-plane affine.
+ * The long edge (85.6 mm) alone defines the scale: the affine's first row
+ * gives mm-per-px along that edge, applied isotropically. When the card is
+ * tilted enough to trip the warning (tiltRatio below TILT_WARN_RATIO) the
+ * projected long-edge scale over-reads by 1/tiltRatio — deliberately left
+ * uncompensated so the user sees the error the warning is about.
  */
 export function mmDistance(m: Affine, p1: Point, p2: Point): number {
-  const inv = affineInverse(m);
-  if (!inv) return 0;
-  const a = applyAffine(inv, p1);
-  const b = applyAffine(inv, p2);
-  return Math.hypot(b.x - a.x, b.y - a.y);
+  const mmPerPx = Math.hypot(m.a, m.c);
+  if (!(mmPerPx > 0)) return 0;
+  const { s1, s2 } = affineSingularValues(m);
+  const tiltRatio = s1 > 1e-9 ? s2 / s1 : 1;
+  const px = Math.hypot(p1.x - p2.x, p1.y - p2.y);
+  if (tiltRatio < TILT_WARN_RATIO) return (px * mmPerPx) / tiltRatio;
+  return px * mmPerPx;
 }
 
 /** Long-edge px-per-mm from the affine (for display). */
 export function longEdgePxPerMm(m: Affine): number {
-  return Math.hypot(m.a, m.c) / CARD_LONG_MM;
+  return 1 / Math.hypot(m.a, m.c);
 }
